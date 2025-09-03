@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;700&display=swap");
+      body {
+        font-family: "Kantumruy Pro", sans-serif;
+        background-color: #f3f4f6;
+      }
+      .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .status-pending {
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+      }
+      .status-approved {
+        background-color: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+      }
+      .status-rejected {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+      }
+      .status-checkedin {
+        background-color: #e0e7ff;
+        color: #3730a3;
+        border: 1px solid #c7d2fe;
+      }
+      .status-overdue {
+        background-color: #fce7f3;
+        color: #9d174d;
+        border: 1px solid #fbcfe8;
+      }
+      .filter-btn.active {
+        background-color: #2563eb;
+        color: white;
+        border-color: #2563eb;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1),
+          0 2px 4px -2px rgb(0 0 0 / 0.1);
+      }
+      .filter-btn {
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+      .modal {
+        transition: opacity 0.3s ease;
+      }
+      .photo-modal-content {
+        max-width: 90vw;
+        max-height: 90vh;
+      }
+      .card {
+        transition: transform 0.2s, box-shadow 0.2s, opacity 0.3s;
+      }
+      .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1),
+          0 4px 6px -4px rgb(0 0 0 / 0.1);
+      }
+      .stat-card {
+        transition: all 0.2s ease-in-out;
+      }
+      .stat-card:hover {
+        transform: scale(1.05);
+      }
+      .card-loader {
+        position: absolute;
+        inset: 0;
+        background-color: rgba(255, 255, 255, 0.8);
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.75rem;
+      }
+      #toast-container {
+        position: fixed;
+        bottom: 1.5rem;
+        left: 1.5rem;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .toast {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border-radius: 0.75rem;
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1),
+          0 4px 6px -4px rgb(0 0 0 / 0.1);
+        transform: translateY(120%);
+        opacity: 0;
+        transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+      }
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      .toast-icon {
+        flex-shrink: 0;
+        width: 1.5rem;
+        height: 1.5rem;
+      }
+      .toast-success {
+        background-color: #ecfdf5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+      }
+      .toast-error {
+        background-color: #fef2f2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+      }
+      .toast-info {
+        background-color: #eff6ff;
+        color: #1e40af;
+        border: 1px solid #bfdbfe;
+      }
+      .details-modal-body {
+        max-height: 70vh;
+      }
+      /* Hide scrollbar for filter buttons */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      details[open] summary svg {
+        transform: rotate(180deg);
+      }
+      .reason-btn {
+        transition: background-color 0.2s, color 0.2s;
+      }
+    </style>
+  </head>
+  <body class="flex flex-col min-h-screen">
+    <div id="toast-container"></div>
+    <main class="flex-grow p-4 md:p-8">
+      <div class="max-w-7xl mx-auto">
+        <div
+          class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4"
+        >
+          <div>
+            <h1 class="text-3xl font-bold text-gray-800">
+              ផ្ទាំងគ្រប់គ្រងការសុំច្បាប់
+            </h1>
+            <p
+              id="adminRoleDisplay"
+              class="text-lg text-blue-700 font-bold mt-1"
+            ></p>
+          </div>
+          <div class="flex flex-col sm:flex-row items-center gap-4">
+            <select
+              id="dateFilter"
+              onchange="handleDateFilterChange()"
+              class="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-shadow bg-white"
+            >
+              <!-- Options will be populated by script -->
+            </select>
+            <input
+              type="text"
+              id="searchInput"
+              onkeyup="handleSearch()"
+              placeholder="ស្វែងរកតាមឈ្មោះ ឬ ID..."
+              class="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-shadow"
+            />
+          </div>
+        </div>
+
+        <!-- Stats & Chart Dashboard - Collapsible on Desktop, Hidden on Mobile -->
+        <details
+          id="stats-details"
+          class="hidden lg:block bg-white rounded-xl shadow-md mb-6"
+        >
+          <summary
+            class="p-4 font-bold text-lg cursor-pointer text-gray-700 hover:bg-gray-50 rounded-t-xl list-none flex justify-between items-center"
+          >
+            <span>បង្ហាញ/លាក់ផ្ទាំងទិន្នន័យ</span>
+            <svg
+              class="w-5 h-5 transform transition-transform"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+              ></path>
+            </svg>
+          </summary>
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4 border-t">
+            <div
+              id="statsDashboard"
+              class="lg:col-span-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4"
+            >
+              <!-- Skeleton loaders for stats -->
+              <div class="bg-white p-4 rounded-lg shadow-sm animate-pulse">
+                <div class="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div class="h-8 bg-gray-300 rounded w-1/3"></div>
+              </div>
+              <div class="bg-white p-4 rounded-lg shadow-sm animate-pulse">
+                <div class="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div class="h-8 bg-gray-300 rounded w-1/3"></div>
+              </div>
+            </div>
+            <div
+              class="lg:col-span-2 bg-gray-50 p-4 rounded-xl flex items-center justify-center min-h-[300px]"
+            >
+              <canvas id="requestsChart"></canvas>
+            </div>
+          </div>
+        </details>
+
+        <div class="bg-white p-4 rounded-xl shadow-md">
+          <div
+            class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4"
+          >
+            <div class="flex-grow overflow-hidden">
+              <div
+                id="filter-buttons"
+                class="flex gap-2 overflow-x-auto no-scrollbar pb-2"
+              >
+                <!-- Filter buttons will be inserted here -->
+              </div>
+            </div>
+            <p
+              id="lastUpdated"
+              class="text-sm text-gray-500 flex items-center gap-2 flex-shrink-0"
+            >
+              <span
+                id="update-spinner"
+                class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500"
+              ></span>
+              <span id="update-text"></span>
+            </p>
+          </div>
+
+          <!-- Requests Container -->
+          <div id="requestsContainer" class="space-y-4">
+            <!-- Request items will be inserted here -->
+          </div>
+
+          <div id="noRequestsMessage" class="hidden text-center py-20">
+            <svg
+              class="mx-auto h-12 w-12 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                vector-effect="non-scaling-stroke"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+              />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">
+              មិនមានការស្នើសុំ
+            </h3>
+            <p class="mt-1 text-sm text-gray-500">
+              មិនមានការស្នើសុំដែលត្រូវនឹងតម្រងរបស់អ្នកទេ។
+            </p>
+          </div>
+          <div id="loadingSpinner" class="text-center py-20">
+            <div class="flex justify-center items-center">
+              <div
+                class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"
+              ></div>
+            </div>
+            <p class="mt-4 text-gray-600">កំពុងទាញទិន្នន័យ...</p>
+          </div>
+          <div id="loadMoreContainer" class="text-center mt-8 hidden">
+            <button
+              id="loadMoreButton"
+              onclick="loadMoreRequests()"
+              class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400"
+            >
+              បង្ហាញបន្ថែម
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Modals -->
+    <div
+      id="detailsModal"
+      class="modal fixed inset-0 bg-gray-800 bg-opacity-75 h-full w-full flex items-center justify-center z-50 hidden"
+    >
+      <div
+        class="relative mx-auto p-5 border w-full max-w-lg shadow-lg rounded-2xl bg-white"
+      >
+        <div class="flex justify-between items-center pb-3 border-b">
+          <h3 class="text-xl leading-6 font-bold text-gray-900">
+            ព័ត៌មានលម្អិតសំណើសុំច្បាប់
+          </h3>
+          <button
+            onclick="closeModal('detailsModal')"
+            class="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <div id="detailsModalContent" class="mt-4">
+          <!-- Dynamic content will be injected here -->
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="confirmationModal"
+      class="modal fixed inset-0 bg-gray-800 bg-opacity-75 h-full w-full flex items-center justify-center z-50 hidden"
+    >
+      <div
+        class="relative mx-auto p-5 border w-full max-w-sm shadow-lg rounded-2xl bg-white"
+      >
+        <div class="mt-3 text-center">
+          <div
+            id="modal-icon-container"
+            class="mx-auto flex items-center justify-center h-12 w-12 rounded-full"
+          ></div>
+          <h3
+            id="confirmationTitle"
+            class="text-lg leading-6 font-medium text-gray-900 mt-4"
+          ></h3>
+          <div class="mt-2 px-7 py-3">
+            <p id="confirmationText" class="text-sm text-gray-500"></p>
+          </div>
+          <div class="flex items-center justify-center gap-4 px-4 py-3">
+            <button
+              id="cancelButton"
+              onclick="closeModal('confirmationModal')"
+              class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none"
+            >
+              បោះបង់
+            </button>
+            <button
+              id="confirmButton"
+              class="px-4 py-2 text-white text-base font-medium rounded-md w-full shadow-sm focus:outline-none"
+            >
+              បញ្ជាក់
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      id="photoModal"
+      class="modal fixed inset-0 bg-black bg-opacity-80 h-full w-full flex items-center justify-center z-50 hidden"
+      onclick="closeModal('photoModal')"
+    >
+      <img
+        id="fullSizePhoto"
+        src=""
+        alt="Full Size Employee Photo"
+        class="photo-modal-content object-contain rounded-lg shadow-2xl"
+        onclick="event.stopPropagation()"
+      />
+    </div>
+
+    <!-- NEW: Rejection Reason Modal -->
+    <div
+      id="rejectionModal"
+      class="modal fixed inset-0 bg-gray-800 bg-opacity-75 h-full w-full flex items-center justify-center z-50 hidden"
+    >
+      <div
+        class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-2xl bg-white"
+      >
+        <div class="flex justify-between items-center pb-3 border-b">
+          <h3 class="text-xl leading-6 font-bold text-gray-900">
+            មូលហេតុនៃការបដិសេធ
+          </h3>
+          <button
+            onclick="closeModal('rejectionModal')"
+            class="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <div class="mt-4 space-y-4">
+          <div>
+            <p class="text-sm font-medium text-gray-700">
+              ជ្រើសរើសមូលហេតុ (អាចរំលងបាន):
+            </p>
+            <div id="rejectionReasonButtons" class="flex flex-wrap gap-2 mt-2">
+              <!-- Reason buttons will be injected here -->
+            </div>
+          </div>
+          <div>
+            <label
+              for="customRejectionReason"
+              class="text-sm font-medium text-gray-700"
+              >ឬសរសេរមូលហេតុផ្សេងទៀត:</label
+            >
+            <textarea
+              id="customRejectionReason"
+              rows="3"
+              class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+            ></textarea>
+          </div>
+        </div>
+        <div
+          class="flex items-center justify-end gap-4 px-4 py-3 mt-4 border-t"
+        >
+          <button
+            onclick="closeModal('rejectionModal')"
+            class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none"
+          >
+            បោះបង់
+          </button>
+          <button
+            id="confirmRejectionButton"
+            class="px-4 py-2 bg-orange-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-orange-600 focus:outline-none"
+          >
+            បញ្ជាក់ការបដិសេធ
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="text-center text-gray-500 text-xs py-4">
+      <p>2025@MMKDARO || Version 31.1.3</p>
+    </footer>
+
+    <script>
+      let isFetching = false;
+      let allRequests = [];
+      let currentFilter = "Pending";
+      let adminRole = "គណៈគ្រប់គ្រងលោកគ្រូ ពៅ ដារ៉ូ";
+      let currentPage = 1;
+      let totalPages = 1;
+      const requestsPerPage = 12;
+      let requestsChart = null;
+      let currentDateFilter = "today_and_pending";
+      let isInitialLoad = true;
+
+      const statusDisplayMap = {
+        Pending: "រង់ចាំអនុម័ត",
+        Approved: "បានអនុម័ត",
+        Rejected: "បដិសេធ",
+        CheckedIn: "បានចូលវិញ",
+        OverdueTime: "លើសម៉ោងចូល",
+        OverdueDay: "លើសថ្ងៃចូល",
+      };
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const roleFromUrl = urlParams.get("role");
+        const adminRoleDisplay = document.getElementById("adminRoleDisplay");
+        const statsDetails = document.getElementById("stats-details");
+
+        if (roleFromUrl) {
+          adminRole = decodeURIComponent(roleFromUrl);
+          adminRoleDisplay.textContent = `ចូលប្រើដោយ: ${adminRole}`;
+        } else {
+          adminRoleDisplay.textContent =
+            "ចូលប្រើដោយ: គណៈគ្រប់គ្រងលោកគ្រូ ពៅ ដារ៉ូ";
+        }
+
+        statsDetails.addEventListener("click", (event) => {
+          if (event.target === statsDetails) {
+            statsDetails.open = false;
+          }
+        });
+
+        fetchAndDisplayData();
+        // UPDATED: Refresh data every 5 seconds for near real-time updates
+        setInterval(fetchAndDisplayData, 5000);
+      });
+
+      function fetchAndDisplayData(isLoadMore = false) {
+        if (isFetching) return;
+        isFetching = true;
+
+        const updateSpinner = document.getElementById("update-spinner");
+        const loadMoreButton = document.getElementById("loadMoreButton");
+
+        if (isLoadMore) {
+          loadMoreButton.disabled = true;
+          loadMoreButton.textContent = "កំពុងផ្ទុក...";
+        } else if (!isInitialLoad) {
+          updateSpinner.classList.remove("hidden");
+        } else {
+          document.getElementById("loadingSpinner").style.display = "block";
+          document.getElementById("requestsContainer").innerHTML = "";
+          document.getElementById("noRequestsMessage").style.display = "none";
+        }
+
+        const handleFinally = () => {
+          isFetching = false;
+          isInitialLoad = false;
+          updateSpinner.classList.add("hidden");
+          if (isLoadMore) {
+            loadMoreButton.disabled = false;
+            loadMoreButton.textContent = "បង្ហាញបន្ថែម";
+          }
+          document.getElementById("loadingSpinner").style.display = "none";
+        };
+
+        google.script.run
+          .withSuccessHandler((response) => {
+            if (!response || response.status !== "success") {
+              displayError(
+                new Error(
+                  response ? response.message : "Invalid server response."
+                )
+              );
+            } else {
+              processServerResponse(response.data, isLoadMore);
+            }
+            handleFinally();
+          })
+          .withFailureHandler((error) => {
+            displayError(error);
+            handleFinally();
+          })
+          .getAdminDashboardData({
+            page: currentPage,
+            limit: requestsPerPage,
+            filter: currentFilter,
+            dateFilter: currentDateFilter,
+          });
+      }
+
+      function processServerResponse(data, isLoadMore) {
+        const now = new Date();
+        document.getElementById(
+          "update-text"
+        ).textContent = `ធ្វើបច្ចុប្បន្នភាពចុងក្រោយ: ${now.toLocaleTimeString(
+          "en-GB"
+        )}`;
+
+        if (!isLoadMore) {
+          allRequests = [];
+        }
+
+        allRequests = allRequests.concat(data.requests);
+        totalPages = data.pagination.totalPages;
+
+        if (isInitialLoad) {
+          populateDateFilter(data.uniqueDates);
+        }
+
+        displayDashboardVisuals(data.stats);
+        updateFilterButtons(data.stats);
+        renderRequests();
+        updateLoadMoreButton();
+      }
+
+      function handleSearch() {
+        renderRequests();
+      }
+
+      function renderRequests() {
+        const container = document.getElementById("requestsContainer");
+        const noRequestsMessage = document.getElementById("noRequestsMessage");
+        const searchTerm = document
+          .getElementById("searchInput")
+          .value.toLowerCase();
+
+        const requestsToRender = allRequests.filter((req) => {
+          return (
+            !searchTerm ||
+            (req.employeeName &&
+              req.employeeName.toLowerCase().includes(searchTerm)) ||
+            (req.employeeId &&
+              req.employeeId.toLowerCase().includes(searchTerm))
+          );
+        });
+
+        container.innerHTML = "";
+
+        if (requestsToRender.length === 0) {
+          noRequestsMessage.style.display = "block";
+        } else {
+          noRequestsMessage.style.display = "none";
+          requestsToRender.forEach((req) => {
+            const itemHTML = createRequestItem(req);
+            container.insertAdjacentHTML("beforeend", itemHTML);
+          });
+        }
+      }
+
+      function loadMoreRequests() {
+        if (currentPage < totalPages) {
+          currentPage++;
+          fetchAndDisplayData(true);
+        }
+      }
+
+      function updateLoadMoreButton() {
+        const loadMoreContainer = document.getElementById("loadMoreContainer");
+        const searchTerm = document.getElementById("searchInput").value;
+        if (currentPage < totalPages && !searchTerm) {
+          loadMoreContainer.classList.remove("hidden");
+        } else {
+          loadMoreContainer.classList.add("hidden");
+        }
+      }
+
+      function displayDashboardVisuals(stats) {
+        const dashboard = document.getElementById("statsDashboard");
+        const statsData = [
+          { label: "សរុប", value: stats.total, color: "blue" },
+          { label: "រង់ចាំអនុម័ត", value: stats.pending, color: "yellow" },
+          { label: "បានអនុម័ត", value: stats.approved, color: "green" },
+          { label: "បានបដិសេធ", value: stats.rejected, color: "red" },
+          { label: "បានចូលវិញ", value: stats.checkedIn, color: "indigo" },
+          { label: "លើសម៉ោងចូល", value: stats.overdueTime, color: "pink" },
+          { label: "លើសថ្ងៃចូល", value: stats.overdueDay, color: "fuchsia" },
+        ];
+        dashboard.innerHTML = statsData
+          .map(
+            (stat) => `
+                <div class="stat-card bg-white p-4 rounded-lg shadow-sm border-l-4 border-${stat.color}-400">
+                    <p class="text-sm text-gray-500 font-medium">${stat.label}</p>
+                    <p class="text-3xl font-bold text-gray-800">${stat.value}</p>
+                </div>
+            `
+          )
+          .join("");
+
+        const ctx = document.getElementById("requestsChart").getContext("2d");
+        const chartData = {
+          labels: [
+            "រង់ចាំអនុម័ត",
+            "បានអនុម័ត",
+            "បដិសេធ",
+            "បានចូលវិញ",
+            "លើសម៉ោង",
+            "លើសថ្ងៃ",
+          ],
+          datasets: [
+            {
+              label: "ចំនួនសំណើ",
+              data: [
+                stats.pending,
+                stats.approved,
+                stats.rejected,
+                stats.checkedIn,
+                stats.overdueTime,
+                stats.overdueDay,
+              ],
+              backgroundColor: [
+                "#facc15",
+                "#4ade80",
+                "#f87171",
+                "#818cf8",
+                "#f472b6",
+                "#e879f9",
+              ],
+              borderColor: [
+                "#facc15",
+                "#4ade80",
+                "#f87171",
+                "#818cf8",
+                "#f472b6",
+                "#e879f9",
+              ],
+              borderWidth: 1,
+            },
+          ],
+        };
+
+        if (requestsChart) {
+          requestsChart.data = chartData;
+          requestsChart.update();
+        } else {
+          requestsChart = new Chart(ctx, {
+            type: "doughnut",
+            data: chartData,
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: "top" },
+                title: {
+                  display: true,
+                  text: "ទិដ្ឋភាពទូទៅនៃសំណើសុំច្បាប់",
+                  font: { size: 16, family: "'Kantumruy Pro', sans-serif" },
+                },
+              },
+            },
+          });
+        }
+      }
+
+      function updateFilterButtons(stats) {
+        const counts = {
+          All: stats.total,
+          Pending: stats.pending,
+          Approved: stats.approved,
+          Rejected: stats.rejected,
+          CheckedIn: stats.checkedIn,
+          OverdueTime: stats.overdueTime,
+          OverdueDay: stats.overdueDay,
+        };
+        const filterContainer = document.getElementById("filter-buttons");
+        filterContainer.innerHTML = [
+          { key: "All", label: "ទាំងអស់" },
+          { key: "Pending", label: statusDisplayMap["Pending"] },
+          { key: "Approved", label: statusDisplayMap["Approved"] },
+          { key: "Rejected", label: statusDisplayMap["Rejected"] },
+          { key: "CheckedIn", label: statusDisplayMap["CheckedIn"] },
+          { key: "OverdueTime", label: statusDisplayMap["OverdueTime"] },
+          { key: "OverdueDay", label: statusDisplayMap["OverdueDay"] },
+        ]
+          .map(
+            (f) =>
+              `<button onclick="filterRequests('${f.key}')" class="filter-btn ${
+                currentFilter === f.key
+                  ? "active"
+                  : "bg-white text-gray-700 hover:bg-gray-100"
+              } px-3 py-1.5 text-sm font-medium rounded-full border border-gray-300">${
+                f.label
+              } (${counts[f.key] || 0})</button>`
+          )
+          .join("");
+      }
+
+      function filterRequests(status) {
+        currentFilter = status;
+        currentPage = 1;
+        fetchAndDisplayData();
+      }
+
+      function createRequestItem(req) {
+        const isCheckedIn = !!req.checkInTimestamp;
+        const isOverdue =
+          currentFilter === "OverdueTime" || currentFilter === "OverdueDay";
+        const statusClasses = {
+          Pending: "status-pending",
+          Approved: isCheckedIn
+            ? "status-checkedin"
+            : isOverdue
+            ? "status-overdue"
+            : "status-approved",
+          Rejected: "status-rejected",
+        };
+        const photoUrl =
+          req.photoUrl ||
+          "https://placehold.co/100x100/EFEFEF/AAAAAA&text=No+Img";
+        let displayText = isCheckedIn
+          ? statusDisplayMap["CheckedIn"]
+          : statusDisplayMap[req.status] || req.status;
+        if (isOverdue) {
+          displayText = statusDisplayMap[currentFilter];
+        }
+
+        return `
+            <div id="card-${
+              req.requestId
+            }" class="card bg-white rounded-xl shadow-md p-4 flex flex-col md:flex-row md:items-center gap-4 relative">
+                <div class="card-loader hidden">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+                <!-- Employee Info -->
+                <div class="flex items-center gap-4 flex-1 min-w-0">
+                    <img class="w-14 h-14 rounded-full object-cover cursor-pointer flex-shrink-0" src="${photoUrl}" alt="Photo" onclick="showFullSizePhoto('${photoUrl}')" onerror="this.onerror=null; this.src='https://placehold.co/100x100/EFEFEF/AAAAAA&text=No+Img';">
+                    <div class="min-w-0">
+                        <p class="font-semibold text-gray-800 text-lg truncate" title="${
+                          req.employeeName
+                        }">${req.employeeName || "N/A"}</p>
+                        <p class="text-sm text-gray-500 truncate">ID: ${
+                          req.employeeId
+                        }</p>
+                    </div>
+                </div>
+                <!-- Request Info (Hidden on Mobile) -->
+                <div class="hidden md:flex flex-col text-sm text-center">
+                    <span class="font-medium text-gray-800">${
+                      req.leaveType
+                    }</span>
+                    <span class="text-gray-500">ប្រភេទច្បាប់</span>
+                </div>
+                <div class="hidden md:flex flex-col text-sm text-center">
+                    <span class="font-medium text-gray-800">${formatDateToKhmer(
+                      req.startDate
+                    )}</span>
+                    <span class="text-gray-500">ពីថ្ងៃ</span>
+                </div>
+                <div class="hidden md:flex flex-col text-sm text-center">
+                    <span class="font-bold text-blue-600 text-lg">${formatDaysDisplay(
+                      req.numberOfDays
+                    )}</span>
+                    <span class="text-gray-500 text-sm">ចំនួន</span>
+                </div>
+                <!-- Status & Actions -->
+                <div class="flex flex-col items-stretch sm:items-end sm:flex-row sm:justify-end gap-3 md:items-center">
+                     <span class="status-badge ${
+                       statusClasses[req.status] || ""
+                     } text-center">${displayText}</span>
+                     <button onclick="showDetailsModal('${
+                       req.requestId
+                     }')" class="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors">ពិនិត្យមើល</button>
+                </div>
+            </div>`;
+      }
+
+      function showDetailsModal(requestId) {
+        const req = allRequests.find((r) => r.requestId === requestId);
+        if (!req) return;
+
+        const isCheckedIn = !!req.checkInTimestamp;
+
+        let documentLinksHTML = "មិនមាន";
+        if (req.documentPhotoUrl) {
+          try {
+            const docUrls = JSON.parse(req.documentPhotoUrl);
+            if (Array.isArray(docUrls) && docUrls.length > 0) {
+              documentLinksHTML = docUrls
+                .map(
+                  (url, index) =>
+                    `<a href="${url}" target="_blank" class="text-blue-600 hover:underline">ឯកសារ ${
+                      index + 1
+                    }</a>`
+                )
+                .join(", ");
+            }
+          } catch (e) {
+            documentLinksHTML = `<a href="${req.documentPhotoUrl}" target="_blank" class="text-blue-600 hover:underline">រូបថតឯកសារ</a>`;
+          }
+        }
+
+        let approverHTML = "";
+        if (req.approver) {
+          let approvalTimeHTML = "";
+          if (req.approvalTimestamp) {
+            const approvalTime = new Date(req.approvalTimestamp).toLocaleString(
+              "en-GB"
+            );
+            approvalTimeHTML = `<span class="block text-xs text-gray-500">នៅ: ${approvalTime}</span>`;
+          }
+          approverHTML = `<div class="mt-2"><span class="font-medium text-gray-600">សម្រេចដោយ:</span> <span class="font-bold text-green-700">${req.approver}</span>${approvalTimeHTML}</div>`;
+        }
+
+        let checkInHTML = "";
+        if (isCheckedIn) {
+          const checkInTime = new Date(req.checkInTimestamp).toLocaleString(
+            "en-GB"
+          );
+          checkInHTML = `
+                    <div class="mt-4 pt-4 border-t">
+                        <h4 class="font-bold text-gray-800 mb-2">ព័ត៌មានចូលមកវិញ</h4>
+                        <p><span class="font-medium text-gray-600">ពេលវេលា:</span> ${checkInTime}</p>
+                        <p><span class="font-medium text-gray-600">រូបថត:</span> <a href="${req.checkInPhotoUrl}" target="_blank" class="text-blue-600 hover:underline">មើលរូបថត</a></p>
+                        <p><span class="font-medium text-gray-600">ទីតាំង:</span> <a href="${req.checkInLocationLink}" target="_blank" class="text-blue-600 hover:underline">មើលទីតាំង</a></p>
+                    </div>`;
+        }
+
+        let dateDisplayHTML = "";
+        let documentDisplayHTML = `<p><span class="font-medium text-gray-600">ឯកសារភ្ជាប់:</span> ${documentLinksHTML}</p>`;
+
+        let paymentReceiptHTML = "";
+        if (req.paymentReceiptUrl) {
+          paymentReceiptHTML = `<p><span class="font-medium text-gray-600">វិក័យបត្របង់ប្រាក់:</span> <a href="${req.paymentReceiptUrl}" target="_blank" class="text-blue-600 hover:underline">មើលវិក័យបត្រ</a></p>`;
+        }
+
+        if (req.leaveType === "ច្បាប់ចេញក្រៅ") {
+          dateDisplayHTML = `<p><span class="font-medium text-gray-600">កាលបរិច្ឆេទ:</span> ${formatDateToKhmer(
+            req.startDate
+          )}</p>`;
+          documentDisplayHTML = ""; // Hide documents for this type
+        } else {
+          // It's 'ច្បាប់ឈប់សម្រាក'
+          const numericDays = parseFloat(req.numberOfDays);
+          if (isNaN(numericDays) || numericDays <= 1) {
+            // Also handles text values like "មួយព្រឹក"
+            dateDisplayHTML = `<p><span class="font-medium text-gray-600">កាលបរិច្ឆេទ:</span> ${formatDateToKhmer(
+              req.startDate
+            )}</p>`;
+          } else {
+            dateDisplayHTML = `
+                        <p><span class="font-medium text-gray-600">ពីថ្ងៃ:</span> ${formatDateToKhmer(
+                          req.startDate
+                        )}</p>
+                        <p><span class="font-medium text-gray-600">ដល់ថ្ងៃ:</span> ${formatDateToKhmer(
+                          req.endDate
+                        )}</p>
+                    `;
+          }
+        }
+
+        const modalContent = document.getElementById("detailsModalContent");
+        modalContent.innerHTML = `
+                <div class="details-modal-body overflow-y-auto pr-2">
+                    <div class="flex items-center gap-4 mb-4">
+                        <img class="w-20 h-20 rounded-full object-cover cursor-pointer" src="${
+                          req.photoUrl ||
+                          "https://placehold.co/100x100/EFEFEF/AAAAAA&text=No+Img"
+                        }" alt="Photo" onclick="showFullSizePhoto('${
+          req.photoUrl
+        }')">
+                        <div>
+                            <p class="font-bold text-xl text-gray-800">${
+                              req.employeeName || "N/A"
+                            }</p>
+                            <p class="text-gray-600">ID: ${req.employeeId}</p>
+                            <p class="text-xs text-gray-400">បានស្នើសុំនៅ: ${new Date(
+                              req.timestamp
+                            ).toLocaleString("en-GB")}</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="grid grid-cols-2 gap-4">
+                            <p><span class="font-medium text-gray-600">ប្រភេទច្បាប់:</span> ${
+                              req.leaveType
+                            }</p>
+                            <p><span class="font-medium text-gray-600">ចំនួន:</span> <span class="font-bold text-blue-600">${formatDaysDisplay(
+                              req.numberOfDays
+                            )}</span></p>
+                            ${dateDisplayHTML}
+                        </div>
+                        <div class="pt-2">
+                            <p class="font-medium text-gray-600">មូលហេតុ:</p>
+                            <p class="text-gray-800 bg-gray-50 p-3 rounded-md mt-1">${
+                              req.reason || "N/A"
+                            }</p>
+                        </div>
+                        <div class="pt-2">
+                             <p><span class="font-medium text-gray-600">រូបថតសាមីខ្លួន:</span> <a href="${
+                               req.selfiePhotoUrl
+                             }" target="_blank" class="text-blue-600 hover:underline">មើលរូបថត</a></p>
+                             <p><span class="font-medium text-gray-600">ទីតាំងស្នើសុំ:</span> <a href="${
+                               req.locationLink
+                             }" target="_blank" class="text-blue-600 hover:underline">មើលទីតាំង</a></p>
+                             ${documentDisplayHTML}
+                             ${paymentReceiptHTML}
+                        </div>
+                        ${approverHTML}
+                        ${checkInHTML}
+                    </div>
+                </div>
+                <div id="actions-${
+                  req.requestId
+                }" class="flex justify-end items-center gap-4 mt-4 pt-4 border-t">
+                </div>
+            `;
+
+        const actionsContainer = modalContent.querySelector(
+          `#actions-${req.requestId}`
+        );
+
+        if (req.status === "Pending") {
+          actionsContainer.innerHTML += `
+                    <button onclick="confirmAction('${req.requestId}', 'Rejected', '${req.leaveType}')" class="px-4 py-2 font-medium text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors">បដិសេធ</button>
+                    <button onclick="confirmAction('${req.requestId}', 'Approved')" class="px-4 py-2 font-medium text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">យល់ព្រម</button>
+                `;
+        } else {
+          actionsContainer.innerHTML += `<span class="text-sm text-gray-500 font-medium">បានសម្រេចរួចរាល់</span>`;
+        }
+
+        if (
+          req.leaveType === "ច្បាប់ចេញក្រៅ" &&
+          req.status === "Approved" &&
+          !req.checkInTimestamp
+        ) {
+          actionsContainer.innerHTML += `
+                    <button onclick="confirmAdminCheckIn('${req.requestId}')" class="px-4 py-2 font-medium text-sm bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors">បញ្ជាក់ការចូលមកវិញ</button>
+                `;
+        }
+
+        actionsContainer.innerHTML += `<button onclick="confirmAction('${req.requestId}', 'Delete')" class="px-4 py-2 font-medium text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors">លុប</button>`;
+
+        openModal("detailsModal");
+      }
+
+      function handleAction(functionName, ...args) {
+        closeModal("confirmationModal");
+        closeModal("detailsModal");
+        const requestId = args[0];
+        const card = document.getElementById(`card-${requestId}`);
+        const loader = card ? card.querySelector(".card-loader") : null;
+        if (loader) loader.classList.remove("hidden");
+
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (res.status === "success") {
+              showToast(res.message || "Action successful!", "success");
+              // Always refresh data to ensure consistency
+              fetchAndDisplayData();
+            } else {
+              showToast(`Action Failed: ${res.message}`, "error");
+              if (loader) loader.classList.add("hidden");
+            }
+          })
+          .withFailureHandler((err) => {
+            showToast(`An error occurred: ${err.message}`, "error");
+            if (loader) loader.classList.add("hidden");
+          })
+          [functionName](...args);
+      }
+
+      function confirmAdminCheckIn(requestId) {
+        const modal = document.getElementById("confirmationModal");
+        const title = document.getElementById("confirmationTitle");
+        const text = document.getElementById("confirmationText");
+        const confirmBtn = document.getElementById("confirmButton");
+        const iconContainer = document.getElementById("modal-icon-container");
+
+        const config = {
+          title: "បញ្ជាក់ការចូលមកវិញ",
+          text: "តើអ្នកពិតជាចង់បញ្ជាក់ថាបុគ្គលិកនេះបានចូលមកវិញមែនទេ? សកម្មភាពនេះគឺសម្រាប់ករណីពិសេសតែប៉ុណ្ណោះ។",
+          btnClass: "bg-indigo-600 hover:bg-indigo-700",
+          icon: `<svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+          iconBg: "bg-indigo-100",
+          handler: () =>
+            handleAction("adminSubmitCheckIn", requestId, adminRole),
+        };
+
+        title.textContent = config.title;
+        text.textContent = config.text;
+        confirmBtn.className = `px-4 py-2 text-white text-base font-medium rounded-md w-full shadow-sm focus:outline-none ${config.btnClass}`;
+        iconContainer.className = `mx-auto flex items-center justify-center h-12 w-12 rounded-full ${config.iconBg}`;
+        iconContainer.innerHTML = config.icon;
+        confirmBtn.onclick = config.handler;
+        openModal("confirmationModal");
+      }
+
+      // --- Utility Functions ---
+      function formatDateToKhmer(isoDateString) {
+        if (!isoDateString) return "";
+        const date = new Date(isoDateString);
+        return date.toLocaleDateString("km-KH", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      }
+      function showFullSizePhoto(url) {
+        if (!url || url.includes("placehold.co")) return;
+        document.getElementById("fullSizePhoto").src = url;
+        openModal("photoModal");
+      }
+      function openModal(modalId) {
+        document.getElementById(modalId).classList.remove("hidden");
+        document.getElementById(modalId).classList.add("flex");
+      }
+      function closeModal(modalId) {
+        document.getElementById(modalId).classList.add("hidden");
+        document.getElementById(modalId).classList.remove("flex");
+      }
+      function displayError(error) {
+        const container = document.getElementById("requestsContainer");
+        container.innerHTML = `<div class="col-span-full text-center p-8 text-red-600 font-bold">Error: ${error.message}</div>`;
+        isFetching = false;
+        document.getElementById("loadingSpinner").style.display = "none";
+      }
+
+      // NEW: Helper function to format day display
+      function formatDaysDisplay(daysValue) {
+        if (!daysValue) return "N/A";
+        const numericValue = parseFloat(daysValue);
+        // Check if daysValue is text like "មួយព្រឹក"
+        if (isNaN(numericValue)) {
+          return daysValue;
+        }
+        // It's a number, so append "day"
+        return `${daysValue} ថ្ងៃ`;
+      }
+
+      function confirmAction(requestId, action, leaveType = "") {
+        const modal = document.getElementById("confirmationModal");
+        const title = document.getElementById("confirmationTitle");
+        const text = document.getElementById("confirmationText");
+        const confirmBtn = document.getElementById("confirmButton");
+        const iconContainer = document.getElementById("modal-icon-container");
+        let config = {};
+
+        if (action === "Rejected") {
+          openRejectionModal(requestId, leaveType);
+          return;
+        }
+
+        switch (action) {
+          case "Approved":
+            config = {
+              title: "បញ្ជាក់ការយល់ព្រម",
+              text: "តើអ្នកពិតជាចង់យល់ព្រមសំណើនេះមែនទេ?",
+              btnClass: "bg-green-600 hover:bg-green-700",
+              icon: `<svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`,
+              iconBg: "bg-green-100",
+              handler: () =>
+                handleAction(
+                  "updateRequestStatus",
+                  requestId,
+                  "Approved",
+                  adminRole
+                ),
+            };
+            break;
+          case "Delete":
+            config = {
+              title: "បញ្ជាក់ការលុប",
+              text: "សកម្មភាពនេះមិនអាចមិនធ្វើវិញបានទេ។ តើអ្នកពិតជាចង់លុបសំណើនេះមែនទេ?",
+              btnClass: "bg-red-600 hover:bg-red-700",
+              icon: `<svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`,
+              iconBg: "bg-red-100",
+              handler: () => handleAction("deleteLeaveRequest", requestId),
+            };
+            break;
+        }
+        title.textContent = config.title;
+        text.textContent = config.text;
+        confirmBtn.className = `px-4 py-2 text-white text-base font-medium rounded-md w-full shadow-sm focus:outline-none ${config.btnClass}`;
+        iconContainer.className = `mx-auto flex items-center justify-center h-12 w-12 rounded-full ${config.iconBg}`;
+        iconContainer.innerHTML = config.icon;
+        confirmBtn.onclick = config.handler;
+        openModal("confirmationModal");
+      }
+
+      function showToast(message, type = "info") {
+        const container = document.getElementById("toast-container");
+        const toast = document.createElement("div");
+        toast.className = `toast toast-${type}`;
+
+        const icons = {
+          success:
+            '<svg class="toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+          error:
+            '<svg class="toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+          info: '<svg class="toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        };
+
+        toast.innerHTML = `
+                ${icons[type]}
+                <p class="ml-3 font-medium text-sm">${message}</p>
+            `;
+
+        container.appendChild(toast);
+
+        setTimeout(() => {
+          toast.classList.add("show");
+        }, 10);
+
+        setTimeout(() => {
+          toast.classList.remove("show");
+          setTimeout(() => {
+            container.removeChild(toast);
+          }, 500);
+        }, 4000);
+      }
+
+      // --- NEW FUNCTIONS FOR REJECTION REASON ---
+      function openRejectionModal(requestId, leaveType) {
+        const reasonButtonsContainer = document.getElementById(
+          "rejectionReasonButtons"
+        );
+        const customReasonInput = document.getElementById(
+          "customRejectionReason"
+        );
+        const confirmBtn = document.getElementById("confirmRejectionButton");
+
+        customReasonInput.value = "";
+        reasonButtonsContainer.innerHTML = "";
+
+        let reasons = [];
+        if (leaveType === "ច្បាប់ចេញក្រៅ") {
+          reasons = [
+            "ប្អូននៅឆ្ងាយពីទីតាំងកំណត់ ប្អូនត្រូវមកសុំអនុញ្ញាតដោយផ្ទាល់នៅអគារ B(DI) ជាមុនសិន!",
+            "ប្អូនមិនបានបើក Allow Location ទេ ! សូមប្អូនបើក Allow Location របស់ប្អូនសិន",
+            "ប្អូនមិនទាន់បង់សេវារដ្ឋបាលទេ!",
+            "ប្អូនសុំច្បាប់ចេញក្រៅញឹកញាប់ណាស់",
+            "ប្អូនមិនបានថតរូបរបស់ប្អូនទេ!",
+          ];
+        } else if (leaveType === "ច្បាប់ឈប់សម្រាក") {
+          reasons = [
+            "ប្អូនមិនបានបើក Allow Location ទេ ! សូមប្អូនបើក Allow Location របស់ប្អូនសិន",
+            "ប្អូនមិនទាន់បង់សេវារដ្ឋបាលទេ!",
+            "ប្អូនមិនបានថតរូបរបស់ប្អូនទេ!",
+          ];
+        }
+
+        reasons.forEach((reason) => {
+          const btn = document.createElement("button");
+          btn.textContent = reason;
+          btn.className =
+            "reason-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-xs hover:bg-orange-200";
+          btn.onclick = () => {
+            // Unselect other buttons
+            reasonButtonsContainer
+              .querySelectorAll("button")
+              .forEach((b) =>
+                b.classList.remove("bg-orange-500", "text-white")
+              );
+            // Select this one
+            btn.classList.add("bg-orange-500", "text-white");
+            customReasonInput.value = reason;
+          };
+          reasonButtonsContainer.appendChild(btn);
+        });
+
+        confirmBtn.onclick = () => handleRejection(requestId);
+
+        openModal("rejectionModal");
+      }
+
+      function handleRejection(requestId) {
+        const reason = document
+          .getElementById("customRejectionReason")
+          .value.trim();
+        closeModal("rejectionModal");
+        handleAction(
+          "updateRequestStatus",
+          requestId,
+          "Rejected",
+          adminRole,
+          reason
+        );
+      }
+
+      // --- NEW FUNCTIONS FOR DATE FILTER ---
+      function populateDateFilter(uniqueDates) {
+        const select = document.getElementById("dateFilter");
+        if (select.options.length > 2 && !isInitialLoad) return; // Don't repopulate unless it's the first load
+
+        const savedValue = currentDateFilter;
+        select.innerHTML =
+          '<option value="all">គ្រប់កាលបរិច្ឆេទ</option><option value="today_and_pending">ថ្ងៃនេះ & រង់ចាំ</option>';
+
+        uniqueDates.forEach((date) => {
+          const option = document.createElement("option");
+          option.value = date;
+          option.textContent = formatDateToKhmer(date);
+          select.appendChild(option);
+        });
+
+        select.value = savedValue;
+      }
+
+      function handleDateFilterChange() {
+        const select = document.getElementById("dateFilter");
+        currentDateFilter = select.value;
+        currentPage = 1;
+        currentFilter = "All"; // Reset status filter when date changes
+        fetchAndDisplayData();
+      }
+    </script>
+  </body>
+</html>
